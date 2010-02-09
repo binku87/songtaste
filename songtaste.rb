@@ -6,6 +6,7 @@ require 'open-uri'
 require 'iconv'
 require 'ruby-debug'
 require 'rchardet'
+require 'colored'
 
 def fixed_text text,size
   space_size = size - text.size
@@ -22,7 +23,7 @@ end
 
 class String
   def to_utf8
-    encoding = CharDet.detect(self)["encoding"] || "GB2312"
+    encoding = "GB2312"#CharDet.detect(self)["encoding"] || "GB2312"
     Iconv.conv('utf-8',encoding,self)
   end
 end
@@ -60,11 +61,18 @@ class Util
 end
 
 class SongTaste
-  attr_reader :songs,:song
+  attr_reader :songs,:song,:current_page
+  TRYLISTENING = 0
+  DOWNLOAD = 1
+  SHOWLIST = 2
 
-  def get_list page = ""
+  def initialize
     @songs = []
-    http = Net::HTTP.new("www.songtaste.com" + page.to_s)
+    @current_page = 0
+  end
+
+  def get_list
+    http = Net::HTTP.new("www.songtaste.com" + (@current_page == 0 ? "" : @current_page.to_s))
     response = http.request_get('/music/')
     response.body.scan(/MSL.*?\)\;/).each do |e|
       begin
@@ -78,15 +86,25 @@ class SongTaste
     end
   end
 
-  def show_list page = ""
-    get_list(page) if @songs.nil?
+  def show_list page = nil 
+    @current_page = page unless page.nil?
+    get_list if @songs.empty?
     @songs.sort! { |x,y| y.rate <=> x.rate }
     num = 1
     @songs.each do |song|
-      puts "#{num < 10 ? " #{num}" : num}.#{rate_bar(song.rate)}#{song.title}"#(#{presenter.to_utf8})"
+      puts "#{num < 10 ? " #{num}" : num}.".red_on_white + "#{rate_bar(song.rate)}".green + "#{song.title}"#(#{presenter.to_utf8})"
       num += 1
     end
-    puts "(Num)Listening (R).Refrash List (N).Next Page (P).Pre Page (Q).Quit"
+  end
+
+  def show_next_list
+    @current_page += 1
+    show_list
+  end
+
+  def show_prev_list
+    @current_page = @current_page == 0 ? 0 : @current_page - 1
+    show_list
   end
 
   def select_song id
@@ -95,33 +113,55 @@ class SongTaste
 
   def try_listening
     return puts("unselect songs yet") if @song.nil?
-    puts "(Q)Quit (P)Pause"
+    puts "Title:".red.bold + "#{@song.title}".white.bold
+    puts "(Q)Quit (P)Pause".blue_on_white
     @song.try_listening
-    puts "(L)List (D)Download (R)Reply"
   end
 
   def download
     return puts("unselect songs yet") if @song.nil?
     @song.download 
   end
+
+  def note_after_cmd cmd
+    case cmd
+    when TRYLISTENING
+      puts "Current Selected Song:" + @song.title
+      puts "(L)List (D)Download (R)Reply (N).Next Page (P).Prev Page (Q).Quit".blue_on_white
+    when SHOWLIST
+      puts "(Num)Listening (U).Refrash List (N).Next Page (P).Prev Page (Q).Quit".blue_on_white
+    when DOWNLOAD
+      puts "(L)List (R)Reply (U).Refrash List (N).Next Page (P).Prev Page (Q).Quit".blue_on_white
+    end
+  end
 end
 
 songtaste = SongTaste.new
 songtaste.show_list
+songtaste.note_after_cmd(SongTaste::SHOWLIST)
 
 while(command = gets)
-  command.chop!
-  exit if command.downcase == "q"
-  if command.to_i > 0
+  case command.chop!.downcase
+  when "q" 
+    exit
+  when /[0-9]{1,3}/
     songtaste.select_song(command.to_i)
     songtaste.try_listening
-    case gets.chop!.downcase
-    when "l"
-      songtaste.show_list
-    when "d"
-      songtaste.download
-    when "r"
-      songtaste.try_listening    
-    end
+    songtaste.note_after_cmd(SongTaste::TRYLISTENING)
+  when "l"
+    songtaste.show_list
+    songtaste.note_after_cmd(SongTaste::SHOWLIST)
+  when "d"
+    songtaste.download
+    songtaste.note_after_cmd(SongTaste::DOWNLOAD)
+  when "r"
+    songtaste.try_listening
+    songtaste.note_after_cmd(SongTaste::TRYLISTENING)
+  when "n"
+    songtaste.show_next_list 
+    songtaste.note_after_cmd(SongTaste::SHOWLIST)
+  when "p"
+    songtaste.show_prev_list 
+    songtaste.note_after_cmd(SongTaste::SHOWLIST)
   end
 end
