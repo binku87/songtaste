@@ -5,7 +5,6 @@ require 'net/http'
 require 'open-uri'
 require 'iconv'
 require 'ruby-debug'
-require 'rchardet'
 require 'colored'
 
 def fixed_text text,size
@@ -23,8 +22,7 @@ end
 
 class String
   def to_utf8
-    encoding = "GB2312"#CharDet.detect(self)["encoding"] || "GB2312"
-    Iconv.conv('utf-8',encoding,self)
+    Iconv.conv('utf-8',"GB2312",self)
   end
 end
 
