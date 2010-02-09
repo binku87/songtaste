@@ -7,6 +7,8 @@ require 'iconv'
 require 'ruby-debug'
 require 'colored'
 
+MUSIC_DIR_ROOT = "/home/binku/media/music"
+
 def fixed_text text,size
   space_size = size - text.size
   return text if space_size < 0
@@ -43,7 +45,7 @@ class SongInfo
   end
 
   def download
-    music_dir = "/home/binku/media/music/#{Time.now.year}.#{Time.now.month}"
+    music_dir = "#{MUSIC_DIR_ROOT}/#{Time.now.year}.#{Time.now.month}"
     Dir.mkdir music_dir unless File.directory?(music_dir)
     `wget #{@url} -P #{music_dir}`
     `cd #{music_dir} && mv preview #{title}.mp3`
